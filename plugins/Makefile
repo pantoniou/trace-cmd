@@ -15,6 +15,7 @@ PLUGIN_OBJS += plugin_scsi.o
 PLUGIN_OBJS += plugin_cfg80211.o
 PLUGIN_OBJS += plugin_blk.o
 PLUGIN_OBJS += plugin_tlb.o
+PLUGIN_OBJS += plugin_syscall.o
 
 PLUGIN_OBJS := $(PLUGIN_OBJS:%.o=$(bdir)/%.o)
 PLUGINS := $(PLUGIN_OBJS:$(bdir)/%.o=$(bdir)/%.so)
