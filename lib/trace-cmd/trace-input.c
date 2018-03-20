@@ -2414,6 +2414,8 @@ int tracecmd_init_data(struct tracecmd_input *handle)
 
 	tracecmd_blk_hack(handle);
 
+	tracecmd_init_data_plugins(handle->plugin_list, handle->pevent, handle);
+
 	return ret;
 }
 

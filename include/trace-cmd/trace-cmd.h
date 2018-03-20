@@ -39,9 +39,14 @@ void tracecmd_parse_ftrace_printk(struct pevent *pevent, char *file, unsigned in
 extern int tracecmd_disable_sys_plugins;
 extern int tracecmd_disable_plugins;
 
+struct tracecmd_input;
+
 struct plugin_list;
 struct plugin_list *tracecmd_load_plugins(struct pevent *pevent);
 void tracecmd_unload_plugins(struct plugin_list *list, struct pevent *pevent);
+void tracecmd_init_data_plugins(struct plugin_list *list,
+				struct pevent *pevent,
+				struct tracecmd_input *handle);
 
 char **tracecmd_event_systems(const char *tracing_dir);
 char **tracecmd_system_events(const char *tracing_dir, const char *system);
@@ -62,7 +67,6 @@ enum {
 void tracecmd_record_ref(struct pevent_record *record);
 void free_record(struct pevent_record *record);
 
-struct tracecmd_input;
 struct tracecmd_output;
 struct tracecmd_recorder;
 struct hook_list;

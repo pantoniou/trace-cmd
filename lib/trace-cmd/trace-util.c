@@ -39,6 +39,10 @@
 #define TRACEFS_PATH "/sys/kernel/tracing"
 #define DEBUGFS_PATH "/sys/kernel/debug"
 
+/* only needed here locally */
+typedef int (*pevent_plugin_init_data_func)(struct pevent *pevent,
+					    struct tracecmd_input *handle);
+
 int tracecmd_disable_sys_plugins;
 int tracecmd_disable_plugins;
 
@@ -1586,6 +1590,20 @@ tracecmd_unload_plugins(struct plugin_list *plugin_list, struct pevent *pevent)
 		dlclose(list->handle);
 		free(list->name);
 		free(list);
+	}
+}
+
+void tracecmd_init_data_plugins(struct plugin_list *plugin_list,
+				struct pevent *pevent,
+				struct tracecmd_input *handle)
+{
+	pevent_plugin_init_data_func func;
+	struct plugin_list *list;
+
+	for (list = plugin_list; list; list = list->next) {
+		func = dlsym(list->handle, PEVENT_PLUGIN_INIT_DATA_NAME);
+		if (func)
+			func(pevent, handle);
 	}
 }
 
