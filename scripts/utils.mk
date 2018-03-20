@@ -60,7 +60,7 @@ do_compile_plugin_obj =				\
 
 do_plugin_build =				\
 	($(print_plugin_build)			\
-	$(CC) $(CFLAGS) $(LDFLAGS) -shared -nostartfiles -o $@ $<)
+	$(CC) $< $(CFLAGS) -shared $(LDFLAGS) -nostartfiles -o $@)
 
 do_compile_python_plugin_obj =			\
 	($(print_plugin_obj_compile)		\
