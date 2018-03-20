@@ -160,6 +160,15 @@ struct pevent_plugin_option {
  *
  * PEVENT_PLUGIN_ALIAS: (optional)
  *   The name to use for finding options (uses filename if not defined)
+ *
+ * PEVENT_PLUGIN_INIT_DATA:  (optional)
+ *   The function name for a plugin callback that needs access to the
+ *   tracecmd_input handle. Note this will only be called when a handle is
+ *   available.
+ *
+ *   void PEVENT_PLUGIN_INIT_DATA(struct pevent *pevent,
+ *   				  struct tracecmd_input *handle)
+ *
  */
 #define PEVENT_PLUGIN_LOADER pevent_plugin_loader
 #define PEVENT_PLUGIN_UNLOADER pevent_plugin_unloader
@@ -171,6 +180,9 @@ struct pevent_plugin_option {
 #define PEVENT_PLUGIN_UNLOADER_NAME MAKE_STR(PEVENT_PLUGIN_UNLOADER)
 #define PEVENT_PLUGIN_OPTIONS_NAME MAKE_STR(PEVENT_PLUGIN_OPTIONS)
 #define PEVENT_PLUGIN_ALIAS_NAME MAKE_STR(PEVENT_PLUGIN_ALIAS)
+
+#define PEVENT_PLUGIN_INIT_DATA pevent_plugin_init_data
+#define PEVENT_PLUGIN_INIT_DATA_NAME MAKE_STR(PEVENT_PLUGIN_INIT_DATA)
 
 enum format_flags {
 	FIELD_IS_ARRAY		= 1,
