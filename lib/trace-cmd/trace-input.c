@@ -3199,6 +3199,16 @@ struct pevent *tracecmd_get_pevent(struct tracecmd_input *handle)
 }
 
 /**
+ * tracecmd_get_uname - return the probed uname
+ * @handle: input handle for the trace.dat file
+ */
+const char *tracecmd_get_uname(struct tracecmd_input *handle)
+{
+	return handle->uname;
+}
+
+
+/**
  * tracecmd_get_use_trace_clock - return use_trace_clock
  * @handle: input handle for the trace.dat file
  */

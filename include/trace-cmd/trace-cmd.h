@@ -203,6 +203,7 @@ tracecmd_get_cursor(struct tracecmd_input *handle, int cpu);
 
 int tracecmd_ftrace_overrides(struct tracecmd_input *handle, struct tracecmd_ftrace *finfo);
 struct pevent *tracecmd_get_pevent(struct tracecmd_input *handle);
+const char *tracecmd_get_uname(struct tracecmd_input *handle);
 bool tracecmd_get_use_trace_clock(struct tracecmd_input *handle);
 tracecmd_show_data_func
 tracecmd_get_show_data_func(struct tracecmd_input *handle);
