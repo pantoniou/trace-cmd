@@ -29,19 +29,99 @@
 #endif
 
 #include "trace-cmd.h"
+#include "event-utils.h"
 
 static struct pevent_plugin_option PEVENT_PLUGIN_OPTIONS[] = {
 	{
 		.name = "arch",
-		.description = "Use this libaudit arch (machine) description (x86, armv7l etc)",
-		.value = "host",
+		.description = "Use this libaudit arch (machine) description (auto, host, x86, armv7l, ...)",
+		.value = "auto",
 	},
 	{
 		.name = NULL,
 	},
 };
 
+#ifndef NO_AUDIT
+
 static struct pevent_plugin_option *syscall_arch = &PEVENT_PLUGIN_OPTIONS[0];
+
+static const char *syscall_uname;
+
+#define MACHINE_UNINIT	-1
+#define MACHINE_BAD	-2
+
+static int syscall_machine = MACHINE_UNINIT;
+
+static int syscall_get_machine(const char *archid)
+{
+	const char *s;
+	int machine = -1;
+
+	/* we got a bad machine? return illegal */
+	if (syscall_machine == MACHINE_BAD)
+		return -1;
+
+	/* we got a good machine, return it */
+	if (syscall_machine >= 0)
+		return syscall_machine;
+
+	/* no archid defaults to "auto" */
+	if (!archid)
+		archid = "auto";
+
+	/* with no uname, "auto" switches to "host" */
+	if (!syscall_uname && !strcmp(archid, "auto"))
+		archid = "host";
+
+	/* okay, we have to probe, first try auto and uname parsing */
+	if (syscall_uname && !strcmp(archid, "auto")) {
+		archid = NULL;
+		s = syscall_uname;
+		/* make sure it's a Linux uname string */
+		if (s && strlen(s) > 6 && !strncmp(s, "Linux", 5)) {
+			/* arch is the last word */
+			s = strrchr(s, ' ');
+			if (s && strlen(s + 1) > 0) {
+				archid = s + 1;
+			}
+		}
+		/* default to host if not found */
+		if (!archid) {
+			archid = "host";
+			pr_stat("bad uname \"%s\"; switching to \"%s\" archid\n",
+					syscall_uname, archid);
+		}
+	}
+
+	/* something other than host? */
+	if (strcmp(archid, "host")) {
+		machine = audit_determine_machine(archid);
+		if (machine < 0) {
+			pr_stat("could not determine machine id for \"%s\"\n",
+					archid);
+			archid = "host";
+		}
+	}
+
+	/* fallback to host */
+	if (machine < 0) {
+		machine = audit_detect_machine();
+		if (machine < 0)
+			pr_stat("could not determine host machine id\n");
+	}
+
+	if (machine < 0) {
+		syscall_machine = MACHINE_BAD;
+		return -1;
+	}
+
+	pr_stat("syscall selected machine name \"%s\"",
+			audit_machine_to_name(machine));
+
+	return syscall_machine = machine;
+}
+#endif
 
 static int syscall_to_name(int sc, char *buf, int bufsz)
 {
@@ -49,10 +129,7 @@ static int syscall_to_name(int sc, char *buf, int bufsz)
 	const char *name = NULL;
 	int machine;
 
-	if (!syscall_arch->value || !strcmp(syscall_arch->value, "host"))
-		machine = audit_detect_machine();
-	else
-		machine = audit_determine_machine(syscall_arch->value);
+	machine = syscall_get_machine(syscall_arch->value);
 	if (machine < 0)
 		goto fail;
 
@@ -89,11 +166,11 @@ static int sys_enter_handler(struct trace_seq *s, struct pevent_record *record,
 		return 1;
 
 	if (syscall_to_name((int)sysnr, sysname, sizeof(sysname)))
-		trace_seq_printf(s, "NR %llu", sysnr);
+		trace_seq_printf(s, "NR %llu ", sysnr);
 	else
 		trace_seq_printf(s, "%s", sysname);
 
-	trace_seq_printf(s, " (");
+	trace_seq_printf(s, "(");
 	data = record->data;
 	for (i = 0; i < field->arraylen; i++) {
 		val = pevent_read_number(field->event->pevent,
@@ -130,7 +207,7 @@ static int sys_exit_handler(struct trace_seq *s, struct pevent_record *record,
 	if (syscall_to_name((int)sysnr, sysname, sizeof(sysname)))
 		trace_seq_printf(s, "NR %llu", sysnr);
 	else
-		trace_seq_printf(s, "%s", sysname);
+		trace_seq_printf(s, "%s()", sysname);
 
 	trace_seq_printf(s, " = %lld", ret);
 
@@ -161,3 +238,15 @@ void PEVENT_PLUGIN_UNLOADER(struct pevent *pevent)
 	pevent_unregister_event_handler(pevent, -1, "raw_syscalls", "sys_exit",
 					sys_exit_handler, NULL);
 }
+
+#ifndef NO_AUDIT
+void PEVENT_PLUGIN_INIT_DATA(struct pevent *pevent, struct tracecmd_input *handle)
+{
+	syscall_uname = tracecmd_get_uname(handle);
+	/* always uninit here, on first handle event it will be probed again again */
+	syscall_machine = MACHINE_UNINIT;
+
+	/* immediately probe machine id to cause any messages to be output early */
+	(void)syscall_get_machine(syscall_arch->value);
+}
+#endif
