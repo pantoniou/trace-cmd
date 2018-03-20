@@ -219,6 +219,9 @@ find_registered_option(const char *plugin, const char *option)
 			else
 				op_plugin = op->file;
 
+			if (!op_plugin)
+				continue;
+
 			if (plugin && strcmp(plugin, op_plugin) != 0)
 				continue;
 			if (strcmp(option, op->name) != 0)
