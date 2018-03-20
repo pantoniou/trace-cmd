@@ -21,6 +21,10 @@ PLUGIN_OBJS := $(PLUGIN_OBJS:%.o=$(bdir)/%.o)
 PLUGINS := $(PLUGIN_OBJS:$(bdir)/%.o=$(bdir)/%.so)
 DEPS := $(PLUGIN_OBJS:$(bdir)/%.o=$(bdir)/.%.d)
 
+ifndef NO_AUDIT
+LDFLAGS += -Wl,--push-state,--as-needed,-laudit,--pop-state
+endif
+
 all: $(PLUGINS)
 
 $(bdir):
