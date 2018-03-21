@@ -596,8 +596,7 @@ static void deka_display(struct deka_data *dd)
 	struct deka_record *dr;
 	int comm_len_max, pid_len_max, time_str_len_max;
 	int cpu_len_max, event_name_len_max;
-	int spi_ts_len_max, spi_overflow_len_max;
-	int spidev_ts_len_max, spidev_overflow_len_max;
+	int spi_ts_len_max, spidev_ts_len_max;
 	int i;
 
 	comm_len_max = strlen("comm");
@@ -621,16 +620,12 @@ static void deka_display(struct deka_data *dd)
 		event_name_len_max = dd->event_name_len_max;
 
 	spi_ts_len_max = strlen("stime");
-	if (spi_ts_len_max < dd->spi_ts_len_max - 3)
-		spi_ts_len_max = dd->spi_ts_len_max - 3;
-
-	spi_overflow_len_max = strlen("sov");
+	if (spi_ts_len_max < dd->spi_ts_len_max - 3 + 1)
+		spi_ts_len_max = dd->spi_ts_len_max - 3 + 1;
 
 	spidev_ts_len_max = strlen("sdtime");
-	if (spidev_ts_len_max < dd->spidev_ts_len_max - 3)
-		spidev_ts_len_max = dd->spidev_ts_len_max - 3;
-
-	spidev_overflow_len_max = strlen("sdov");
+	if (spidev_ts_len_max < dd->spidev_ts_len_max - 3 + 1)
+		spidev_ts_len_max = dd->spidev_ts_len_max - 3 + 1;
 
 	printf("SPI overflows #%d\n", dd->spi_overflows);
 	printf("SPIDEV overflows #%d\n", dd->spidev_overflows);
@@ -640,41 +635,37 @@ static void deka_display(struct deka_data *dd)
 	printf("\n");
 
 
-	printf("%*s-%-*s | %*s | %*s | %*s | %-*s | %*s | %-*s | %-*s | %s\n",
+	printf("%*s-%-*s | %*s | %*s | %*s | %*s | %-*s | %s\n",
 		comm_len_max, "comm",
 		pid_len_max, "pid",
 		time_str_len_max, "time",
 		cpu_len_max, "cpu",
 		spi_ts_len_max, "stime",
-		spi_overflow_len_max, "sov",
-		spidev_ts_len_max, "stime",
-		spidev_overflow_len_max, "sov",
+		spidev_ts_len_max, "sdtime",
 		event_name_len_max, "event",
 		"info");
 
-	printf("%s-%s | %s | %s | %s | %s | %s | %s | %s | %s\n",
+	printf("%s-%s | %s | %s | %s | %s | %s | %s\n",
 		dashes(comm_len_max),
 		dashes(pid_len_max),
 		dashes(time_str_len_max),
 		dashes(cpu_len_max),
 		dashes(spi_ts_len_max),
-		dashes(spi_overflow_len_max),
 		dashes(spidev_ts_len_max),
-		dashes(spidev_overflow_len_max),
 		dashes(event_name_len_max),
 		dashes(10));
 
 	for (i = 0; i < dd->recnr; i++) {
 		dr = &dd->rec[i];
-		printf("%*s-%-*d | %*s | %*d | %*llu | %-*s | %*llu | %-*s | %-*s | %s\n",
+		printf("%*s-%-*d | %*s | %*d | %*llu%c | %*llu%c | %-*s | %s\n",
 			comm_len_max, dr_comm(dr),
 			pid_len_max, dr_pid(dr),
 			time_str_len_max, dr_time_str(dr),
 			cpu_len_max, dr_cpu(dr),
-			spi_ts_len_max, dr_spi_ts_in_usecs(dr),
-			spi_overflow_len_max, dr_spi_overflow(dr) ? "!" : " ",
-			spidev_ts_len_max, dr_spidev_ts_in_usecs(dr),
-			spidev_overflow_len_max, dr_spidev_overflow(dr) ? "!" : " ",
+			spi_ts_len_max - 1, dr_spi_ts_in_usecs(dr),
+			dr_spi_overflow(dr) ? '!' : ' ',
+			spidev_ts_len_max - 1, dr_spidev_ts_in_usecs(dr),
+			dr_spidev_overflow(dr) ? '!' : ' ',
 			event_name_len_max, dr_event_name(dr),
 			dr_info_str(dr));
 	}
