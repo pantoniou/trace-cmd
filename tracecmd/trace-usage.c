@@ -286,6 +286,11 @@ static struct usage_help usage_help[] = {
 		"          -N do not load any plugins\n"
 	},
 	{
+		"deka",
+		"deka scheduling analysis",
+		" %s deka\n"
+	},
+	{
 		NULL, NULL, NULL
 	}
 };

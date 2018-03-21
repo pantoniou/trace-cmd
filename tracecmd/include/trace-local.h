@@ -100,6 +100,8 @@ void trace_show(int argc, char **argv);
 
 void trace_list(int argc, char **argv);
 
+void trace_deka(int argc, char **argv);
+
 void trace_usage(int argc, char **argv);
 
 struct hook_list;
