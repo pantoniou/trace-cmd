@@ -280,6 +280,7 @@ static void deka_preprocess_spi(struct deka_data *dd)
 	char buf[32];	/* for printing integers */
 	unsigned long long last_ts;
 	bool last_overflow;
+	bool probable_sync;
 
 	printf("DEKA: SPI clock %lu usecs, allowed jitter %lu usecs\n",
 			deka_spi_clock_usecs, deka_spi_jitter_usecs);
@@ -288,28 +289,35 @@ static void deka_preprocess_spi(struct deka_data *dd)
 	for (i = 0; i < dd->recnr; i++) {
 		dr = &dd->rec[i];
 
-		/* comm=ioserver, event=spi_transfer_start, info=*len=8* */
-		if (!strcmp(dr_comm(dr), "ioserver") &&
-		    !strcmp(dr_event_name(dr), "spi_transfer_start") &&
-		    strstr(dr_info_str(dr), "len=8")) {
+		/* ioctl syscall on ioserver */
+		if (strcmp(dr_comm(dr), "ioserver") ||
+		    strcmp(dr_event_name(dr), "sys_enter") ||
+		    strncmp(dr_info_str(dr), "ioctl(", 6))
+			continue;
 
-			/* look for ioctl that caused this */
-			for (j = i - 1; j >= 0; j--) {
-				dr = &dd->rec[j];
+		probable_sync = false;
+		for (j = i; j < dd->recnr; j++) {
+			dr = &dd->rec[j];
 
-				/* if we hit an earlier sync point we're done */
-				if (dr->spi_sync_start)
-					break;
+			/* only on ioserver */
+			if (strcmp(dr_comm(dr), "ioserver"))
+				continue;
 
-				if (!strcmp(dr_comm(dr), "ioserver") &&
-				    !strcmp(dr_event_name(dr), "sys_enter") &&
-				    strstr(dr_info_str(dr), "ioctl")) {
+			/* message submit? got it */
+			if (!strcmp(dr_event_name(dr), "spi_message_submit"))
+				probable_sync = true;
+
+			/* not found, break */
+			if (!strcmp(dr_event_name(dr), "sys_exit") &&
+			    !strncmp(dr_info_str(dr), "ioctl()", 7)) {
+
+				if (probable_sync && !strcmp(dr_info_str(dr), "ioctl() = 8")) {
+					dr = &dd->rec[i];
 					dr->spi_sync_start = true;
-					break;
 				}
-			}
 
-			dr = &dd->rec[i];
+				break;
+			}
 		}
 	}
 
@@ -383,7 +391,7 @@ static void deka_preprocess_spidev(struct deka_data *dd)
 		/* ioctl syscall on ioserver */
 		if (strcmp(dr_comm(dr), "ioserver") ||
 		    strcmp(dr_event_name(dr), "sys_enter") ||
-		    !strstr(dr_info_str(dr), "ioctl"))
+		    strncmp(dr_info_str(dr), "ioctl(", 6))
 			continue;
 
 		for (j = i; j < dd->recnr; j++) {
@@ -402,7 +410,7 @@ static void deka_preprocess_spidev(struct deka_data *dd)
 
 			/* not found, break */
 			if (!strcmp(dr_event_name(dr), "sys_exit") &&
-			    !strstr(dr_info_str(dr), "ioctl"))
+			    !strncmp(dr_info_str(dr), "ioctl()", 7))
 			    break;
 		}
 	}
