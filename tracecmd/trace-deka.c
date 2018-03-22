@@ -380,27 +380,30 @@ static void deka_preprocess_spidev(struct deka_data *dd)
 	for (i = 0; i < dd->recnr; i++) {
 		dr = &dd->rec[i];
 
-		/* comm=ioserver, event=spi_transfer_start, info=*len=8* */
-		if (!strcmp(dr_comm(dr), "ioserver") &&
-		    !strcmp(dr_event_name(dr), "spi_transfer_start")) {
+		/* ioctl syscall on ioserver */
+		if (strcmp(dr_comm(dr), "ioserver") ||
+		    strcmp(dr_event_name(dr), "sys_enter") ||
+		    !strstr(dr_info_str(dr), "ioctl"))
+			continue;
 
-			/* look for ioctl that caused this */
-			for (j = i - 1; j >= 0; j--) {
-				dr = &dd->rec[j];
+		for (j = i; j < dd->recnr; j++) {
+			dr = &dd->rec[j];
 
-				/* if we hit an earlier sync point we're done */
-				if (dr->spidev_sync_start)
-					break;
+			/* only on ioserver */
+			if (strcmp(dr_comm(dr), "ioserver"))
+				continue;
 
-				if (!strcmp(dr_comm(dr), "ioserver") &&
-				    !strcmp(dr_event_name(dr), "sys_enter") &&
-				    strstr(dr_info_str(dr), "ioctl")) {
-					dr->spidev_sync_start = true;
-					break;
-				}
+			/* message submit? got it */
+			if (!strcmp(dr_event_name(dr), "spi_message_submit")) {
+				dr = &dd->rec[i];
+				dr->spidev_sync_start = true;
+				break;
 			}
 
-			dr = &dd->rec[i];
+			/* not found, break */
+			if (!strcmp(dr_event_name(dr), "sys_exit") &&
+			    !strstr(dr_info_str(dr), "ioctl"))
+			    break;
 		}
 	}
 
