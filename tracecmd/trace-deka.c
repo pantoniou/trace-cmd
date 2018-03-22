@@ -94,6 +94,7 @@ struct deka_record {
 	unsigned long long spidev_ts;
 	bool spidev_sync_start;
 	bool spidev_overflow;
+	bool spidev_schedule_out;
 };
 
 struct deka_data {
@@ -109,12 +110,13 @@ struct deka_data {
 	int ts_len_max;
 
 	int spi_ts_len_max;
-	int spi_overflows;
+	unsigned long long spi_overflows;
 
 	int spidev_ts_len_max;
-	int spidev_overflows;
+	unsigned long long spidev_overflows;
 	unsigned long long spidev_min_lat_ts;
 	unsigned long long spidev_max_lat_ts;
+	unsigned long long spidev_schedule_outs;
 
 	int recnr;
 	struct deka_record rec[];
@@ -183,6 +185,11 @@ static inline unsigned long long dr_spidev_ts_in_usecs(struct deka_record *dr)
 static inline bool dr_spidev_overflow(struct deka_record *dr)
 {
 	return dr->spidev_overflow;
+}
+
+static inline bool dr_spidev_schedule_out(struct deka_record *dr)
+{
+	return dr->spidev_schedule_out;
 }
 
 static struct deka_data *deka_init(const char *input_file)
@@ -354,7 +361,7 @@ static void deka_preprocess_spi(struct deka_data *dd)
 	}
 
 	if (dr_first_overflow)
-		printf("DEKA: detected #%d SPI overflows (first at %s)\n",
+		printf("DEKA: detected #%llu SPI overflows (first at %s)\n",
 				dd->spi_overflows,
 				dr_time_str(dr_first_overflow));
 
@@ -374,10 +381,11 @@ static void deka_preprocess_spidev(struct deka_data *dd)
 {
 	struct deka_record *dr;
 	struct deka_record *dr_first_overflow;
+	struct deka_record *dr_first_schedout;
 	int i, j, len;
 	char buf[32];	/* for printing integers */
 	unsigned long long last_ts;
-	bool last_overflow;
+	bool last_overflow, last_schedout;
 	unsigned long long min_lat, max_lat;
 	int run;
 
@@ -418,11 +426,14 @@ static void deka_preprocess_spidev(struct deka_data *dd)
 	last_ts = -1LLU;
 	last_overflow = false;
 	dr_first_overflow = NULL;
+	dr_first_schedout = NULL;
 
 	/* calculate min/max/avg spidev latency */
 	min_lat = -1LLU;
 	max_lat = 0;
 	run = 0;
+
+	last_schedout = false;
 
 	/* now handle overflows */
 	dd->spidev_overflows = 0;
@@ -432,6 +443,7 @@ static void deka_preprocess_spidev(struct deka_data *dd)
 		if (dr->spidev_sync_start) {
 			last_ts = dr_ts(dr);
 			last_overflow = false;
+			last_schedout = false;
 			run = 0;
 		}
 
@@ -445,6 +457,14 @@ static void deka_preprocess_spidev(struct deka_data *dd)
 				last_overflow = true;
 				if (!dr_first_overflow)
 					dr_first_overflow = dr;
+			}
+
+			dr->spidev_schedule_out = !!strcmp(dr_comm(dr), "ioserver");
+			if (dr->spidev_schedule_out && !last_schedout) {
+				dd->spidev_schedule_outs++;
+				last_schedout = true;
+				if (!dr_first_schedout)
+					dr_first_schedout = dr;
 			}
 
 			run++;
@@ -470,9 +490,14 @@ static void deka_preprocess_spidev(struct deka_data *dd)
 	dd->spidev_max_lat_ts = max_lat;
 
 	if (dr_first_overflow)
-		printf("DEKA: detected #%d SPIDEV overflows (first at %s)\n",
+		printf("DEKA: detected #%llu SPIDEV overflows (first at %s)\n",
 				dd->spidev_overflows,
 				dr_time_str(dr_first_overflow));
+
+	if (dr_first_schedout)
+		printf("DEKA: detected #%llu SPIDEV schedule outs (first at %s)\n",
+				dd->spidev_schedule_outs,
+				dr_time_str(dr_first_schedout));
 
 
 	dd->spidev_ts_len_max = 0;
@@ -635,11 +660,12 @@ static void deka_display(struct deka_data *dd)
 		spi_ts_len_max = dd->spi_ts_len_max - 3 + 1;
 
 	spidev_ts_len_max = strlen("sdtime");
-	if (spidev_ts_len_max < dd->spidev_ts_len_max - 3 + 1)
-		spidev_ts_len_max = dd->spidev_ts_len_max - 3 + 1;
+	if (spidev_ts_len_max < dd->spidev_ts_len_max - 3 + 2)
+		spidev_ts_len_max = dd->spidev_ts_len_max - 3 + 2;
 
-	printf("SPI overflows #%d\n", dd->spi_overflows);
-	printf("SPIDEV overflows #%d\n", dd->spidev_overflows);
+	printf("SPI overflows #%llu\n", dd->spi_overflows);
+	printf("SPIDEV overflows #%llu\n", dd->spidev_overflows);
+	printf("SPIDEV schedule-outs #%llu\n", dd->spidev_schedule_outs);
 	printf("SPIDEV min/max latency %llu/%llu usecs\n",
 			dd->spidev_min_lat_ts / 1000,
 			dd->spidev_max_lat_ts / 1000);
@@ -668,15 +694,16 @@ static void deka_display(struct deka_data *dd)
 
 	for (i = 0; i < dd->recnr; i++) {
 		dr = &dd->rec[i];
-		printf("%*s-%-*d | %*s | %*d | %*llu%c | %*llu%c | %-*s | %s\n",
+		printf("%*s-%-*d | %*s | %*d | %*llu%c | %*llu%c%c | %-*s | %s\n",
 			comm_len_max, dr_comm(dr),
 			pid_len_max, dr_pid(dr),
 			time_str_len_max, dr_time_str(dr),
 			cpu_len_max, dr_cpu(dr),
 			spi_ts_len_max - 1, dr_spi_ts_in_usecs(dr),
 			dr_spi_overflow(dr) ? '!' : ' ',
-			spidev_ts_len_max - 1, dr_spidev_ts_in_usecs(dr),
+			spidev_ts_len_max - 2, dr_spidev_ts_in_usecs(dr),
 			dr_spidev_overflow(dr) ? '!' : ' ',
+			dr_spidev_schedule_out(dr) ? '>' : ' ',
 			event_name_len_max, dr_event_name(dr),
 			dr_info_str(dr));
 	}
